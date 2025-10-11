@@ -38,10 +38,14 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Setup AWS SAM CLI
-        uses: aws-actions/setup-sam@v2
-        with:
-          version: "1.*"
+      - name: Install AWS SAM CLI (pipx)
+        run: |
+          python3 -m pip install --user pipx
+          python3 -m pipx ensurepath
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          pipx install aws-sam-cli
+      - name: Verify SAM CLI
+        run: sam --version
 
       - name: Install dependencies (server only)
         run: |
