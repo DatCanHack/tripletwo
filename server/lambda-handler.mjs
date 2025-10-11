@@ -20,7 +20,7 @@ export const handler = async (event, context) => {
   }
 
   if (!cachedHandler) {
-    const mod = await import("./src/app-minimal.js");
+    const mod = await import("./src/app.js");
     const app = mod.default || mod.app || mod;
     cachedHandler = serverless(app);
   }

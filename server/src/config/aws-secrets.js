@@ -67,17 +67,40 @@ export async function loadAWSSecrets() {
   }
 
   try {
-    // Load SSM parameters
-    const databaseUrl = await getSSMParameter(process.env.SSM_DATABASE_URL_PARAM);
-    const jwtSecret = await getSSMParameter(process.env.SSM_JWT_SECRET_PARAM);
-    
-    // Load Secrets Manager secret
-    const openaiApiKey = await getSecretsManagerSecret(process.env.SECRETS_OPENAI_API_KEY_NAME);
+    // Load SSM parameters if names are provided
+    const dbParam = process.env.SSM_DATABASE_URL_PARAM;
+    const jwtParam = process.env.SSM_JWT_SECRET_PARAM;
+    const jwtRefreshParam = process.env.SSM_JWT_REFRESH_SECRET_PARAM;
+    const openaiSecretName = process.env.SECRETS_OPENAI_API_KEY_NAME;
 
-    // Set them in process.env so existing code can use them
-    process.env.DATABASE_URL = databaseUrl;
-    process.env.JWT_SECRET = jwtSecret;
-    process.env.OPENAI_API_KEY = openaiApiKey;
+    if (dbParam) {
+      const databaseUrl = await getSSMParameter(dbParam);
+      if (databaseUrl) process.env.DATABASE_URL = databaseUrl;
+    }
+
+    if (jwtParam) {
+      const jwtSecret = await getSSMParameter(jwtParam);
+      if (jwtSecret) {
+        process.env.JWT_SECRET = process.env.JWT_SECRET || jwtSecret;
+        // Ensure refresh secret is available; fallback to the same value if a separate one isn't provided
+        process.env.REFRESH_SECRET = process.env.REFRESH_SECRET || jwtSecret;
+      }
+    }
+
+    if (jwtRefreshParam) {
+      const refreshSecret = await getSSMParameter(jwtRefreshParam);
+      if (refreshSecret) process.env.REFRESH_SECRET = refreshSecret;
+    }
+
+    if (openaiSecretName) {
+      const openaiApiKey = await getSecretsManagerSecret(openaiSecretName);
+      if (openaiApiKey) process.env.OPENAI_API_KEY = openaiApiKey;
+    }
+
+    // Final safety: if only JWT is available, reuse it for refresh
+    if (process.env.JWT_SECRET && !process.env.REFRESH_SECRET) {
+      process.env.REFRESH_SECRET = process.env.JWT_SECRET;
+    }
 
   } catch (error) {
     console.error('Failed to load AWS secrets:', error);

@@ -13,3 +13,13 @@ __tests__
 *.spec.js
 .git
 .gitignore
+test-db.js
+package-*.json
+
+# Large dependencies that might have dev files
+node_modules/**/*.d.ts
+node_modules/**/*.map
+node_modules/**/docs/
+node_modules/**/examples/
+node_modules/**/test/
+node_modules/**/tests/

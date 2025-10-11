@@ -4,6 +4,7 @@ import morgan from "morgan";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { env } from "./config/env.js";
+import prisma from "./config/database.js";
 import { authRoutes } from "./routes/auth.routes.js";
 import { accountRoutes } from "./routes/account.routes.js";
 import { contentRoutes } from "./routes/content.routes.js";
@@ -27,10 +28,12 @@ const DEFAULT_ALLOWLIST = [
   "http://localhost:4173",
   "http://127.0.0.1:4173",
   ".vercel.app",
+  ".amplifyapp.com",
   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
   process.env.FRONTEND_URL || null,
   process.env.WEB_URL || null,
   "https://twentytwo-eight.vercel.app",
+  "https://main.dezleujsj0pht.amplifyapp.com",
 ].filter(Boolean);
 
 // Nếu có CORS_ORIGIN thì dùng THÊM cùng với mặc định (không ghi đè)
@@ -101,6 +104,9 @@ app.options("*", cors(corsOptions));
 
 /* ------------------- Healthcheck ------------------- */
 app.get("/", (_req, res) => res.json({ ok: true, name: "FitX API" }));
+app.get("/health", (_req, res) =>
+  res.json({ status: "healthy", timestamp: new Date().toISOString() })
+);
 app.get("/db-ping", async (_req, res) => {
   try {
     await prisma.$connect();
