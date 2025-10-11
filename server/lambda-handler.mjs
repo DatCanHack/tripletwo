@@ -10,7 +10,7 @@ export const handler = async (event, context) => {
   // Load AWS secrets once on cold start
   if (!secretsLoaded) {
     try {
-      const { loadAWSSecrets } = await import("../server/src/config/aws-secrets.js");
+      const { loadAWSSecrets } = await import("./src/config/aws-secrets.js");
       await loadAWSSecrets();
       secretsLoaded = true;
     } catch (error) {
@@ -20,7 +20,7 @@ export const handler = async (event, context) => {
   }
 
   if (!cachedHandler) {
-    const mod = await import("../server/src/app.js");
+    const mod = await import("./src/app-minimal.js");
     const app = mod.default || mod.app || mod;
     cachedHandler = serverless(app);
   }

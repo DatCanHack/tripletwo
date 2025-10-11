@@ -18,10 +18,10 @@ Globals:
         # Optional: set one or both to your frontend URL for CORS allowlist in the app
         WEB_URL: ""
         FRONTEND_URL: ""
-        # Secrets via dynamic references (create these before deploy)
-        DATABASE_URL: "{{resolve:ssm:/my-fitness-app/DATABASE_URL:1}}"
-        JWT_SECRET: "{{resolve:ssm:/my-fitness-app/JWT_SECRET:1}}"
-        OPENAI_API_KEY: "{{resolve:secretsmanager:my-fitness-app/OPENAI_API_KEY:SecretString}}"
+        # Secrets are loaded at runtime from SSM and Secrets Manager
+        SSM_DATABASE_URL_PARAM: "/my-fitness-app/DATABASE_URL"
+        SSM_JWT_SECRET_PARAM: "/my-fitness-app/JWT_SECRET"
+        SECRETS_OPENAI_API_KEY_NAME: "my-fitness-app/OPENAI_API_KEY"
 
 Resources:
   AppHttpApi:
@@ -35,8 +35,8 @@ Resources:
   ApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: .
-      Handler: lambda/handler.handler
+      CodeUri: server
+      Handler: lambda-handler.handler
       Events:
         ProxyApi:
           Type: HttpApi
@@ -52,6 +52,18 @@ Resources:
             Method: ANY
       Policies:
         - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+                - ssm:GetParameters
+              Resource:
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/my-fitness-app/*"
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:my-fitness-app/*"
 
 Outputs:
   ApiUrl:

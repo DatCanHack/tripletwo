@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# AWS SAM
+.aws-sam/
+samconfig.toml.bak
