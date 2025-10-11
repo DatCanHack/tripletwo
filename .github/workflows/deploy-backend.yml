@@ -43,9 +43,8 @@ jobs:
         with:
           version: latest
 
-      - name: Install dependencies
+      - name: Install dependencies (server only)
         run: |
-          npm ci
           npm --prefix server ci
           npm --prefix server run prisma:generate
 
