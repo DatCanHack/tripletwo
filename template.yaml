@@ -4,9 +4,8 @@ Description: FitX API - AWS SAM template for Express on Lambda + API Gateway (HT
 
 Globals:
   Function:
-    Runtime: nodejs18.x
-    Timeout: 20
-    MemorySize: 1024
+    Timeout: 30
+    MemorySize: 2048
     Architectures:
       - arm64
     Environment:
@@ -35,8 +34,10 @@ Resources:
   ApiFunction:
     Type: AWS::Serverless::Function
     Properties:
+      PackageType: Zip
       CodeUri: server
       Handler: lambda-handler.handler
+      Runtime: nodejs20.x
       Events:
         ProxyApi:
           Type: HttpApi
