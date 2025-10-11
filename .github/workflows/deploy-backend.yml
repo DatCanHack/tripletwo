@@ -41,7 +41,7 @@ jobs:
       - name: Setup AWS SAM CLI
         uses: aws-actions/setup-sam@v2
         with:
-          version: "*"
+          version: "1.*"
 
       - name: Install dependencies (server only)
         run: |
