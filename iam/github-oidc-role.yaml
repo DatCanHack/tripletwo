@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: IAM role for GitHub Actions (OIDC) to deploy SAM stacks
+Parameters:
+  GitHubOrg:
+    Type: String
+    Description: GitHub organization or user name
+  GitHubRepo:
+    Type: String
+    Description: GitHub repository name
+  Branch:
+    Type: String
+    Default: main
+    Description: Branch allowed to assume this role
+Resources:
+  GitHubActionsDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub github-actions-sam-deploy-${GitHubOrg}-${GitHubRepo}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - !Sub repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${Branch}
+      ManagedPolicyArns:
+        # Broad for initial setup. Tighten later to least-privilege if desired.
+        - arn:aws:iam::aws:policy/AdministratorAccess
+Outputs:
+  RoleArn:
+    Value: !GetAtt GitHubActionsDeployRole.Arn
+    Description: Add this value as AWS_DEPLOY_ROLE_ARN in your GitHub repo secrets

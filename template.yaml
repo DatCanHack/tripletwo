@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: FitX API - AWS SAM template for Express on Lambda + API Gateway (HTTP API)
+
+Globals:
+  Function:
+    Runtime: nodejs18.x
+    Timeout: 20
+    MemorySize: 1024
+    Architectures:
+      - arm64
+    Environment:
+      Variables:
+        NODE_ENV: production
+        NODE_OPTIONS: --enable-source-maps
+        # Allow Amplify domains by default; you can override with a specific domain later
+        CORS_ORIGIN: .amplifyapp.com
+        # Optional: set one or both to your frontend URL for CORS allowlist in the app
+        WEB_URL: ""
+        FRONTEND_URL: ""
+        # Secrets via dynamic references (create these before deploy)
+        DATABASE_URL: "{{resolve:ssm:/my-fitness-app/DATABASE_URL:1}}"
+        JWT_SECRET: "{{resolve:ssm:/my-fitness-app/JWT_SECRET:1}}"
+        OPENAI_API_KEY: "{{resolve:secretsmanager:my-fitness-app/OPENAI_API_KEY:SecretString}}"
+
+Resources:
+  AppHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowMethods: ['*']
+        AllowHeaders: ['*']
+        AllowOrigins: ['*']
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: lambda/handler.handler
+      Events:
+        ProxyApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AppHttpApi
+            Path: /{proxy+}
+            Method: ANY
+        RootApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AppHttpApi
+            Path: /
+            Method: ANY
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+Outputs:
+  ApiUrl:
+    Description: Base URL of the HTTP API
+    Value: !Sub "https://${AppHttpApi}.execute-api.${AWS::Region}.amazonaws.com"

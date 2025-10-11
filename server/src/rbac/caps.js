@@ -1,0 +1,24 @@
+export const FEAT = {
+  ALL_LESSONS: "ALL_LESSONS",
+  VIDEO_1080P: "VIDEO_1080P",
+  PROGRAM_4W: "PROGRAM_4W",
+  MENU_SPECIAL: "MENU_SPECIAL",
+  COACH_1_1: "COACH_1_1",
+  OFFLINE: "OFFLINE",
+};
+
+export const PLAN_CAPS = {
+  FREE: [],
+  BASIC: [FEAT.PROGRAM_4W],
+  PRO: [FEAT.ALL_LESSONS, FEAT.VIDEO_1080P, FEAT.PROGRAM_4W, FEAT.MENU_SPECIAL],
+  ELITE: [
+    FEAT.ALL_LESSONS,
+    FEAT.VIDEO_1080P,
+    FEAT.PROGRAM_4W,
+    FEAT.MENU_SPECIAL,
+    FEAT.COACH_1_1,
+    FEAT.OFFLINE,
+  ],
+};
+
+export const hasFeat = (plan, feat) => (PLAN_CAPS[plan] || []).includes(feat);
