@@ -19,6 +19,12 @@ permissions:
 env:
   AWS_REGION: ap-southeast-1
   STACK_NAME: my-fitness-app-api
+  # Optional: provide comma-separated lists to enable VPC for Lambda
+  # Example:
+  # VPC_SUBNET_IDS: subnet-aaaa,subnet-bbbb
+  # VPC_SG_IDS: sg-xxxxxxxx
+  VPC_SUBNET_IDS: "subnet-0dc446f73f6492723,subnet-0b6932f3c1ac24bce"
+  VPC_SG_IDS: "sg-0db339984913cccf7"
 
 jobs:
   deploy:
@@ -66,13 +72,18 @@ jobs:
 
       - name: SAM Deploy
         run: |
+          PARAMS=""
+          if [ -n "${VPC_SUBNET_IDS}" ] && [ -n "${VPC_SG_IDS}" ]; then
+            PARAMS="--parameter-overrides VpcSubnetIds=${VPC_SUBNET_IDS} VpcSecurityGroupIds=${VPC_SG_IDS}"
+          fi
           sam deploy \
             --stack-name "$STACK_NAME" \
             --resolve-s3 \
             --capabilities CAPABILITY_IAM \
             --region "$AWS_REGION" \
             --no-confirm-changeset \
-            --no-fail-on-empty-changeset
+            --no-fail-on-empty-changeset \
+            $PARAMS
 
       - name: Show API URL
         run: |

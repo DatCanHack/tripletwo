@@ -1,7 +1,7 @@
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-1.0.x"]
-  previewFeatures = ["driverAdapters"]
+  // Include both the build machine (native) and the Lambda runtime (AL2023 arm64 openssl3)
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
 }
 datasource db {
   provider  = "postgresql"

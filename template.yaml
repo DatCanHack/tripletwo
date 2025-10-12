@@ -2,6 +2,21 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: FitX API - AWS SAM template for Express on Lambda + API Gateway (HTTP API)
 
+Parameters:
+  VpcSubnetIds:
+    Type: String
+    Default: ""
+    Description: Comma-separated subnet IDs for Lambda (private subnets with NAT recommended)
+  VpcSecurityGroupIds:
+    Type: String
+    Default: ""
+    Description: Comma-separated security group IDs for Lambda ENIs
+
+Conditions:
+  UseVPC: !And
+    - !Not [ !Equals [ !Ref VpcSubnetIds, "" ] ]
+    - !Not [ !Equals [ !Ref VpcSecurityGroupIds, "" ] ]
+
 Globals:
   Function:
     Timeout: 30
@@ -31,6 +46,16 @@ Resources:
         AllowHeaders: ['*']
         AllowOrigins: ['*']
 
+  PrismaLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: my-fitness-app-prisma-layer
+      Description: Prisma Client (linux-arm64-openssl-3.0.x)
+      ContentUri: layers/prisma
+      CompatibleRuntimes:
+        - nodejs20.x
+      RetentionPolicy: Delete
+
   ApiFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -38,6 +63,13 @@ Resources:
       CodeUri: server
       Handler: lambda-handler.handler
       Runtime: nodejs20.x
+      Layers:
+        - !Ref PrismaLayer
+      VpcConfig: !If
+        - UseVPC
+        - SubnetIds: !Split [",", !Ref VpcSubnetIds]
+          SecurityGroupIds: !Split [",", !Ref VpcSecurityGroupIds]
+        - !Ref AWS::NoValue
       Events:
         ProxyApi:
           Type: HttpApi
@@ -53,6 +85,7 @@ Resources:
             Method: ANY
       Policies:
         - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
         - Statement:
             - Effect: Allow
               Action:
@@ -65,6 +98,19 @@ Resources:
                 - secretsmanager:GetSecretValue
               Resource:
                 - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:my-fitness-app/*"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - lambda-handler.mjs
+        Minify: true
+        Sourcemap: true
+        Target: "node20"
+        External:
+          # Loại bỏ aws-sdk v2 (đã có sẵn trong runtime). Keep @aws-sdk/* (v3) if used.
+          - aws-sdk
+          # Để Prisma nằm ngoài bundle và cài riêng ở bước InstallCommands
+          - "@prisma/client"
 
 Outputs:
   ApiUrl:
