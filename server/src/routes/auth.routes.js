@@ -196,25 +196,44 @@ const RegisterSchema = z.object({
 
 authRoutes.post("/register", async (req, res) => {
   try {
-    try {
-      await ensureDb();
-    } catch {
-      return res
-        .status(503)
-        .json({ error: "DB_CONNECT_TIMEOUT", message: "DB không sẵn sàng." });
-    }
+    console.log("[auth/register] Starting registration for:", req.body?.email);
+    
+    // Step 1: Check DB
+    console.log("[auth/register] Step 1: Checking DB connection...");
+    await ensureDb();
+    console.log("[auth/register] Step 1: DB connection OK");
 
+    // Step 2: Parse input
+    console.log("[auth/register] Step 2: Parsing input...");
     const { name, email, password } = RegisterSchema.parse(req.body);
+    console.log("[auth/register] Step 2: Input parsed OK", { name, email });
+    
+    // Step 3: Check existing user
+    console.log("[auth/register] Step 3: Checking if user exists...");
     const existed = (await sql`select 1 from users where email = ${email} limit 1`)[0];
+    console.log("[auth/register] Step 3: User exists check:", !!existed);
+    
     if (existed) {
       return res
         .status(409)
         .json({ error: "EMAIL_EXISTS", message: "Email đã được đăng ký." });
     }
+    
+    // Step 4: Hash password
+    console.log("[auth/register] Step 4: Hashing password...");
     const passwordHash = await bcrypt.hash(password, 10);
+    console.log("[auth/register] Step 4: Password hashed OK");
+    
+    // Step 5: Insert user
+    console.log("[auth/register] Step 5: Inserting user...");
     await sql`insert into users (name, email, password) values (${name}, ${email}, ${passwordHash})`;
+    console.log("[auth/register] Step 5: User inserted OK");
+    
     return res.status(201).json({ ok: true });
   } catch (err) {
+    console.error("[auth/register] Error at step:", err);
+    console.error("[auth/register] Error stack:", err.stack);
+    
     if (err?.issues) {
       return res.status(400).json({
         error: "VALIDATION_ERROR",
@@ -224,7 +243,7 @@ authRoutes.post("/register", async (req, res) => {
     }
     return res
       .status(500)
-      .json({ error: "INTERNAL", message: "Có lỗi xảy ra" });
+      .json({ error: "INTERNAL", message: "Có lỗi xảy ra: " + (err?.message || String(err)) });
   }
 });
 
