@@ -28,7 +28,8 @@ export const requireAuth = async (req, res, next) => {
   const payload = tryVerify(bearer) || tryVerify(cookieTok);
   if (!payload) return res.status(401).json({ error: "Invalid/expired token" });
 
-  const rows = await sql`select id, email, name, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt" from "User" where id = ${payload.sub} limit 1`;
+  // Use lowercase 'users' table to match the rest of the codebase
+  const rows = await sql`select id, email, name, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt" from users where id = ${payload.sub} limit 1`;
   const user = rows[0] || null;
 
   if (!user || user.active === false) {
