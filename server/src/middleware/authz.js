@@ -2,7 +2,8 @@
 import { sql } from "../db/sql.js";
 import { verifyAccess, verifyRefresh, signAccess } from "../utils/jwt.js";
 
-const isProd = process.env.NODE_ENV === "production";
+// Allow local development to force dev-style cookies without changing NODE_ENV
+const isProd = process.env.FORCE_DEV_COOKIES === "true" ? false : process.env.NODE_ENV === "production";
 const ACCESS_COOKIE = "fitx_access";
 const REFRESH_COOKIE = "fitx_refresh";
 

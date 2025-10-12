@@ -7,7 +7,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "dev": "nodemon src/index.js",
+    "dev": "FORCE_DEV_COOKIES=true nodemon src/index.js",
     "start": "node src/index.js",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",

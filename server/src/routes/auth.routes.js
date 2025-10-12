@@ -23,7 +23,7 @@ const withTimeout = (p, ms, label) =>
       setTimeout(() => rej(new Error(`Timeout at ${label} after ${ms}ms`)), ms)
     ),
   ]);
-const isProd = process.env.NODE_ENV === "production";
+const isProd = process.env.FORCE_DEV_COOKIES === "true" ? false : process.env.NODE_ENV === "production";
 const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID);
 
 // Cookie names
