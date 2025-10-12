@@ -274,7 +274,7 @@ authRoutes.post("/login", async (req, res, next) => {
     await withTimeout(ensureDb(), 7000, "db.connect");
 
     const userRows = await withTimeout(
-      sql`select id, name, email, password, "createdAt", "updatedAt" from users where email = ${email} limit 1`,
+      sql`select id, name, email, password, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt", "updatedAt" from users where email = ${email} limit 1`,
       8000,
       "user.findUnique"
     );
@@ -348,7 +348,7 @@ authRoutes.post("/refresh", async (req, res) => {
     }
 
     await ensureDb();
-    const userRows = await sql`select id, name, email, "createdAt", "updatedAt" from users where id = ${userId} limit 1`;
+    const userRows = await sql`select id, name, email, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt", "updatedAt" from users where id = ${userId} limit 1`;
     const user = userRows[0] || null;
 
     if (!user) {

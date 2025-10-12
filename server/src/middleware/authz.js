@@ -28,23 +28,28 @@ export const requireAuth = async (req, res, next) => {
   const payload = tryVerify(bearer) || tryVerify(cookieTok);
   if (!payload) return res.status(401).json({ error: "Invalid/expired token" });
 
-  // Use lowercase 'users' table to match the rest of the codebase
-  const rows = await sql`select id, email, name, "createdAt" from users where id = ${payload.sub} limit 1`;
+  // Lấy đầy đủ thông tin quyền từ bảng users
+  const rows = await sql`
+    select id, email, name, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt"
+    from users
+    where id = ${payload.sub}
+    limit 1
+  `;
   const u = rows[0] || null;
 
   if (!u) {
     return res.status(401).json({ error: "User not found" });
   }
 
-  // Normalize to a common shape used by routes
+  // Chuẩn hoá object user dùng chung
   const user = {
     id: u.id,
     email: u.email,
     name: u.name ?? null,
-    role: 'USER',
-    active: true,
-    subscriptionPlan: 'FREE',
-    subscriptionBilling: null,
+    role: u.role || 'USER',
+    active: u.active ?? true,
+    subscriptionPlan: u.subscriptionPlan ?? 'FREE',
+    subscriptionBilling: u.subscriptionBilling ?? null,
     createdAt: u.createdAt ?? null,
   };
 
@@ -68,7 +73,7 @@ export const handleRefresh = async (req, res) => {
 
   try {
     const payload = verifyRefresh(token);
-    const rows = await sql`select * from "User" where id = ${payload.sub} limit 1`;
+    const rows = await sql`select * from users where id = ${payload.sub} limit 1`;
     const user = rows[0] || null;
     if (!user) return res.status(401).json({ error: "User not found" });
 

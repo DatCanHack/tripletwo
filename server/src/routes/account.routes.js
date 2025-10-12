@@ -13,7 +13,7 @@ accountRoutes.get("/me", requireAuth, (req, res) => {
 accountRoutes.patch("/me", requireAuth, async (req, res) => {
   const { name, avatarUrl } = req.body || {};
   const rows = await sql`
-    update "User"
+    update users
     set "name" = ${name}, "avatarUrl" = ${avatarUrl}
     where id = ${req.user.id}
     returning *
@@ -31,7 +31,7 @@ accountRoutes.patch("/me/subscription", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Invalid plan/billing" });
 
   const rows = await sql`
-    update "User"
+    update users
     set "subscriptionPlan" = ${plan}, "subscriptionBilling" = ${billing || null}, "subscriptionSince" = now()
     where id = ${req.user.id}
     returning *
@@ -48,7 +48,7 @@ accountRoutes.patch(
   async (req, res) => {
     const { plan, billing } = req.body || {};
     const rows = await sql`
-      update "User"
+      update users
       set "subscriptionPlan" = ${plan}, "subscriptionBilling" = ${billing || null}, "subscriptionSince" = now()
       where id = ${req.params.id}
       returning *

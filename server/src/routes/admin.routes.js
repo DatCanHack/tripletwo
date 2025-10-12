@@ -35,14 +35,14 @@ adminRoutes.get("/users", async (req, res, next) => {
 
     const items = await sql`
       select id, email, name, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt"
-      from "User"
+      from users
       ${whereClause}
       order by "createdAt" desc
       offset ${(page - 1) * limit}
       limit ${limit}
     `;
 
-    const countRows = await sql`select count(*)::int as count from "User" ${whereClause}`;
+    const countRows = await sql`select count(*)::int as count from users ${whereClause}`;
     const total = countRows[0]?.count || 0;
 
     res.json({ items: items.map(toPublicUser), total, page, limit });
@@ -56,7 +56,7 @@ adminRoutes.get("/users", async (req, res, next) => {
  */
 adminRoutes.get("/users/:id", async (req, res, next) => {
   try {
-const rows = await sql`select id, email, name, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt" from "User" where id = ${req.params.id} limit 1`;
+const rows = await sql`select id, email, name, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt" from users where id = ${req.params.id} limit 1`;
     const u = rows[0] || null;
     if (!u) return res.status(404).json({ error: "Not found" });
     res.json({ user: toPublicUser(u) });
@@ -74,7 +74,7 @@ adminRoutes.patch("/users/:id/role", async (req, res, next) => {
     if (!["ADMIN", "USER"].includes(role))
       return res.status(400).json({ error: "Invalid role" });
 
-const upd = await sql`update "User" set role = ${role} where id = ${req.params.id} returning id, email, role`;
+const upd = await sql`update users set role = ${role} where id = ${req.params.id} returning id, email, role`;
     const u = upd[0] || null;
 
     res.json({ user: u });
@@ -96,7 +96,7 @@ adminRoutes.patch("/users/:id/subscription", async (req, res, next) => {
       return res.status(400).json({ error: "Invalid billing" });
 
 const upd = await sql`
-      update "User"
+      update users
       set "subscriptionPlan" = ${plan}, "subscriptionBilling" = ${billing || null}
       where id = ${req.params.id}
       returning id, email, "subscriptionPlan", "subscriptionBilling"
@@ -115,7 +115,7 @@ const upd = await sql`
 adminRoutes.patch("/users/:id/active", async (req, res, next) => {
   try {
     const { active } = req.body || {};
-const upd = await sql`update "User" set active = ${!!active} where id = ${req.params.id} returning id, email, active`;
+const upd = await sql`update users set active = ${!!active} where id = ${req.params.id} returning id, email, active`;
     const u = upd[0] || null;
     res.json({ user: u });
   } catch (e) {
@@ -128,7 +128,7 @@ const upd = await sql`update "User" set active = ${!!active} where id = ${req.pa
  */
 adminRoutes.delete("/users/:id", async (req, res, next) => {
   try {
-await sql`delete from "User" where id = ${req.params.id}`;
+await sql`delete from users where id = ${req.params.id}`;
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -146,7 +146,7 @@ const invRows = await sql`update "Invoice" set status = 'PAID', "paidAt" = now()
 
     if (inv?.userId) {
       await sql`
-        update "User"
+        update users
         set "subscriptionPlan" = ${inv.plan}, "subscriptionBilling" = ${inv.billing}
         where id = ${inv.userId}
       `;
