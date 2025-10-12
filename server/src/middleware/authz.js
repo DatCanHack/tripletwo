@@ -29,12 +29,24 @@ export const requireAuth = async (req, res, next) => {
   if (!payload) return res.status(401).json({ error: "Invalid/expired token" });
 
   // Use lowercase 'users' table to match the rest of the codebase
-  const rows = await sql`select id, email, name, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt" from users where id = ${payload.sub} limit 1`;
-  const user = rows[0] || null;
+  const rows = await sql`select id, email, name, "createdAt" from users where id = ${payload.sub} limit 1`;
+  const u = rows[0] || null;
 
-  if (!user || user.active === false) {
+  if (!u) {
     return res.status(401).json({ error: "User not found" });
   }
+
+  // Normalize to a common shape used by routes
+  const user = {
+    id: u.id,
+    email: u.email,
+    name: u.name ?? null,
+    role: 'USER',
+    active: true,
+    subscriptionPlan: 'FREE',
+    subscriptionBilling: null,
+    createdAt: u.createdAt ?? null,
+  };
 
   req.user = user;
   next();

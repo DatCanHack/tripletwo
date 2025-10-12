@@ -342,12 +342,13 @@ authRoutes.post("/refresh", async (req, res) => {
     }
 
     const decoded = verifyRefresh(token);
-    if (!decoded?.userId) {
+    const userId = decoded?.sub;
+    if (!userId) {
       return res.status(401).json({ error: "INVALID_REFRESH_TOKEN" });
     }
 
     await ensureDb();
-    const userRows = await sql`select id, name, email, "createdAt", "updatedAt" from users where id = ${decoded.userId} limit 1`;
+    const userRows = await sql`select id, name, email, "createdAt", "updatedAt" from users where id = ${userId} limit 1`;
     const user = userRows[0] || null;
 
     if (!user) {
