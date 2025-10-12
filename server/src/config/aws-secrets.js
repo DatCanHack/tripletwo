@@ -71,6 +71,7 @@ export async function loadAWSSecrets() {
     const dbParam = process.env.SSM_DATABASE_URL_PARAM;
     const jwtParam = process.env.SSM_JWT_SECRET_PARAM;
     const jwtRefreshParam = process.env.SSM_JWT_REFRESH_SECRET_PARAM;
+    const googleClientIdParam = process.env.SSM_GOOGLE_CLIENT_ID_PARAM;
     const openaiSecretName = process.env.SECRETS_OPENAI_API_KEY_NAME;
 
     if (dbParam) {
@@ -90,6 +91,11 @@ export async function loadAWSSecrets() {
     if (jwtRefreshParam) {
       const refreshSecret = await getSSMParameter(jwtRefreshParam);
       if (refreshSecret) process.env.REFRESH_SECRET = refreshSecret;
+    }
+
+    if (googleClientIdParam) {
+      const googleClientId = await getSSMParameter(googleClientIdParam);
+      if (googleClientId) process.env.GOOGLE_CLIENT_ID = googleClientId;
     }
 
     if (openaiSecretName) {

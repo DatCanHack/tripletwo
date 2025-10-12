@@ -35,6 +35,7 @@ Globals:
         # Secrets are loaded at runtime from SSM and Secrets Manager
         SSM_DATABASE_URL_PARAM: "/my-fitness-app/DATABASE_URL"
         SSM_JWT_SECRET_PARAM: "/my-fitness-app/JWT_SECRET"
+        SSM_GOOGLE_CLIENT_ID_PARAM: "/my-fitness-app/GOOGLE_CLIENT_ID"
         SECRETS_OPENAI_API_KEY_NAME: "my-fitness-app/OPENAI_API_KEY"
 
 Resources:
