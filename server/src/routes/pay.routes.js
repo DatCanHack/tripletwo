@@ -6,6 +6,17 @@ import { env } from "../config/env.js";
 
 export const payRoutes = Router();
 
+// small timeout helper to avoid long hangs when DB is cold/unreachable
+const withTimeout = (p, ms = 2000) =>
+  Promise.race([
+    p,
+    new Promise((_, rej) => setTimeout(() => {
+      const err = new Error("DB_TIMEOUT");
+      err.code = "DB_TIMEOUT";
+      rej(err);
+    }, ms)),
+  ]);
+
 // YÊU CẦU ĐĂNG NHẬP
 payRoutes.use(requireAuth);
 
@@ -60,10 +71,10 @@ payRoutes.post("/create", async (req, res) => {
 
     // Lưu DB nếu có bảng "Payment" (nếu không có sẽ bị catch và bỏ qua)
     try {
-      await sql`
+      await withTimeout(sql`
         insert into "Payment" (id, "userId", amount, currency, provider, plan, billing, status, meta)
         values (${paymentId}, ${userId}, ${amount}, ${CURRENCY}, 'VIETQR', ${plan}, ${billing}, 'PENDING', ${JSON.stringify({ imageUrl, info, bankBin: BANK_BIN, account: BANK_ACC, name: BANK_NAME })})
-      `;
+      `, 2000);
     } catch (e) {
       if (process.env.NODE_ENV !== "test") {
         console.warn("PAYMENT_PERSIST_SKIP:", e?.code || e?.message);
