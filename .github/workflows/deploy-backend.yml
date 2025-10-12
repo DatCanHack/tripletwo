@@ -59,6 +59,17 @@ jobs:
           npm --prefix server ci
           npm --prefix server run prisma:generate
 
+      - name: Prepare Prisma Layer (install + generate linux-arm64)
+        run: |
+          set -euo pipefail
+          npm --prefix layers/prisma/nodejs ci
+          # Force binary engines and include linux-arm64 target defined in layer schema
+          PRISMA_CLI_QUERY_ENGINE_TYPE=binary \
+          npx --prefix layers/prisma/nodejs prisma generate --schema layers/prisma/prisma/schema.prisma
+          # Remove dev deps from layer to reduce size
+          npm --prefix layers/prisma/nodejs prune --omit=dev
+          du -sh layers/prisma || true
+
       - name: Show server folder size (debug)
         run: du -sh server || true
 
