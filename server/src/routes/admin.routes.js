@@ -29,20 +29,22 @@ adminRoutes.get("/users", async (req, res, next) => {
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit || "20", 10)));
 
     const like = `%${q}%`;
-    const whereClause = q
-      ? sql`where "email" ilike ${like} or "name" ilike ${like}`
-      : sql``;
 
+    // Tránh compose SQL fragment — dùng điều kiện an toàn theo tham số
     const items = await sql`
       select id, email, name, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt"
       from users
-      ${whereClause}
+      where (${q} = '' or email ilike ${like} or name ilike ${like})
       order by "createdAt" desc
       offset ${(page - 1) * limit}
       limit ${limit}
     `;
 
-    const countRows = await sql`select count(*)::int as count from users ${whereClause}`;
+    const countRows = await sql`
+      select count(*)::int as count
+      from users
+      where (${q} = '' or email ilike ${like} or name ilike ${like})
+    `;
     const total = countRows[0]?.count || 0;
 
     res.json({ items: items.map(toPublicUser), total, page, limit });
