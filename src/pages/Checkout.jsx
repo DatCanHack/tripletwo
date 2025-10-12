@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../services/apiClient";
+import DebugPanel from "../components/DebugPanel";
+import { debugLogger } from "../utils/debugLogger";
 
 import {
   PLANS as PLAN_DEF, // { BASIC:{key:'BASIC', name:'Basic'}, PRO:{...}, ELITE:{...} }
@@ -86,7 +88,7 @@ function getPriceUSDCompat(planKey, billing) {
 }
 
 export default function Checkout() {
-  const { user } = useAuth();
+  const { user, login, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -120,6 +122,26 @@ export default function Checkout() {
     e?.preventDefault?.();
     setServerError("");
     setSubmitting(true);
+    
+    // Check if user is authenticated
+    if (!user) {
+      setServerError("Bạn cần đăng nhập để thanh toán. Vui lòng đăng nhập lại.");
+      setSubmitting(false);
+      return;
+    }
+    
+    // Debug: Log request details
+    debugLogger.payment('Creating VietQR Invoice', {
+      plan: planMeta.key,
+      billing,
+      name,
+      email,
+      coupon,
+      userId: user?.id,
+      userEmail: user?.email,
+      hasToken: !!api.tokenStore?.get?.()
+    });
+    
     try {
       // Gửi đúng enum cho BE
       const resp = await api.createVietQRInvoice({
@@ -131,8 +153,9 @@ export default function Checkout() {
       });
       setQrData(resp);
       setShowQR(true);
+      debugLogger.payment('VietQR Invoice Created Successfully', { invoiceId: resp?.invoice?.id, amount: resp?.invoice?.amount });
     } catch (err) {
-      console.error('Payment creation error:', err);
+      debugLogger.error('Payment Creation Failed', err);
       let errorMessage = "Không tạo được VietQR, thử lại nhé.";
       
       if (err?.code === 'NETWORK_ERROR') {
@@ -140,7 +163,41 @@ export default function Checkout() {
       } else if (err?.code === 'TIMEOUT') {
         errorMessage = "Yêu cầu quá thời gian. Vui lòng thử lại.";
       } else if (err?.status === 401) {
-        errorMessage = "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.";
+        // Authentication error - try to refresh token
+        debugLogger.auth('Authentication Failed - Attempting Token Refresh', { status: err.status, message: err.message });
+        try {
+          const refreshSuccess = await api.refresh();
+          if (refreshSuccess) {
+            // Try to get user data again to confirm authentication
+            const userResponse = await api.me();
+            if (userResponse?.user) {
+              // Token refresh succeeded, retry the payment request
+              debugLogger.auth('Token Refreshed Successfully - Retrying Payment', { userId: userResponse.user?.id });
+              try {
+                const retryResp = await api.createVietQRInvoice({
+                  plan: planMeta.key,
+                  billing,
+                  name,
+                  email,
+                  coupon,
+                });
+                setQrData(retryResp);
+                setShowQR(true);
+                setServerError(""); // Clear any error since retry succeeded
+                debugLogger.payment('Payment Retry Successful After Token Refresh', { invoiceId: retryResp?.invoice?.id });
+                return; // Exit successfully
+              } catch (retryErr) {
+                debugLogger.error('Payment Retry Failed After Token Refresh', retryErr);
+                errorMessage = retryErr?.message || "Lỗi khi tạo thanh toán sau khi làm mới token.";
+              }
+            }
+          }
+        } catch (refreshErr) {
+          debugLogger.error('Token Refresh Failed', refreshErr);
+        }
+        
+        // If we reach here, token refresh failed or retry failed
+        errorMessage = "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại để tiếp tục thanh toán.";
       } else if (err?.message) {
         errorMessage = err.message;
       }
@@ -342,6 +399,9 @@ export default function Checkout() {
           </div>
         </div>
       )}
+      
+      {/* Debug Panel - Remove in production */}
+      <DebugPanel />
     </div>
   );
 }
