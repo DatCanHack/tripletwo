@@ -3,8 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../services/apiClient";
-import DebugPanel from "../components/DebugPanel";
-import { debugLogger } from "../utils/debugLogger";
 
 import {
   PLANS as PLAN_DEF, // { BASIC:{key:'BASIC', name:'Basic'}, PRO:{...}, ELITE:{...} }
@@ -130,18 +128,6 @@ export default function Checkout() {
       return;
     }
     
-    // Debug: Log request details
-    debugLogger.payment('Creating VietQR Invoice', {
-      plan: planMeta.key,
-      billing,
-      name,
-      email,
-      coupon,
-      userId: user?.id,
-      userEmail: user?.email,
-      hasToken: !!api.tokenStore?.get?.()
-    });
-    
     try {
       // Gửi đúng enum cho BE
       const resp = await api.createVietQRInvoice({
@@ -153,9 +139,7 @@ export default function Checkout() {
       });
       setQrData(resp);
       setShowQR(true);
-      debugLogger.payment('VietQR Invoice Created Successfully', { invoiceId: resp?.invoice?.id, amount: resp?.invoice?.amount });
     } catch (err) {
-      debugLogger.error('Payment Creation Failed', err);
       let errorMessage = "Không tạo được VietQR, thử lại nhé.";
       
       if (err?.code === 'NETWORK_ERROR') {
@@ -164,7 +148,6 @@ export default function Checkout() {
         errorMessage = "Yêu cầu quá thời gian. Vui lòng thử lại.";
       } else if (err?.status === 401) {
         // Authentication error - try to refresh token
-        debugLogger.auth('Authentication Failed - Attempting Token Refresh', { status: err.status, message: err.message });
         try {
           const refreshSuccess = await api.refresh();
           if (refreshSuccess) {
@@ -172,7 +155,6 @@ export default function Checkout() {
             const userResponse = await api.me();
             if (userResponse?.user) {
               // Token refresh succeeded, retry the payment request
-              debugLogger.auth('Token Refreshed Successfully - Retrying Payment', { userId: userResponse.user?.id });
               try {
                 const retryResp = await api.createVietQRInvoice({
                   plan: planMeta.key,
@@ -184,16 +166,14 @@ export default function Checkout() {
                 setQrData(retryResp);
                 setShowQR(true);
                 setServerError(""); // Clear any error since retry succeeded
-                debugLogger.payment('Payment Retry Successful After Token Refresh', { invoiceId: retryResp?.invoice?.id });
                 return; // Exit successfully
               } catch (retryErr) {
-                debugLogger.error('Payment Retry Failed After Token Refresh', retryErr);
                 errorMessage = retryErr?.message || "Lỗi khi tạo thanh toán sau khi làm mới token.";
               }
             }
           }
         } catch (refreshErr) {
-          debugLogger.error('Token Refresh Failed', refreshErr);
+          // ignore
         }
         
         // If we reach here, token refresh failed or retry failed
@@ -400,8 +380,6 @@ export default function Checkout() {
         </div>
       )}
       
-      {/* Debug Panel - Remove in production */}
-      <DebugPanel />
     </div>
   );
 }

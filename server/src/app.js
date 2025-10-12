@@ -117,15 +117,6 @@ app.get("/db-ping", async (_req, res) => {
   }
 });
 
-app.get("/debug/headers", (req, res) => {
-  res.json({
-    origin: req.headers.origin,
-    authorization: req.headers.authorization ? 'Bearer ***' : 'None',
-    cookies: Object.keys(req.cookies || {}),
-    userAgent: req.headers['user-agent'],
-    timestamp: new Date().toISOString()
-  });
-});
 /* ------------------- Routes ------------------- */
 app.use("/ai", aiRoutes);
 app.use("/auth", authRoutes);
