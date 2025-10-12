@@ -23,8 +23,8 @@ env:
   # Example:
   # VPC_SUBNET_IDS: subnet-aaaa,subnet-bbbb
   # VPC_SG_IDS: sg-xxxxxxxx
-  VPC_SUBNET_IDS: "subnet-0dc446f73f6492723,subnet-0b6932f3c1ac24bce"
-  VPC_SG_IDS: "sg-0db339984913cccf7"
+  VPC_SUBNET_IDS: ""
+  VPC_SG_IDS: ""
 
 jobs:
   deploy:
