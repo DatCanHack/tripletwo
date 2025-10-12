@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { prisma } from "../db/prisma.js";
+import { sql } from "../db/sql.js";
 import { requireAuth, requireRole, publicUser } from "../middleware/authz.js";
 
 export const accountRoutes = Router();
@@ -12,10 +12,13 @@ accountRoutes.get("/me", requireAuth, (req, res) => {
 // update profile self
 accountRoutes.patch("/me", requireAuth, async (req, res) => {
   const { name, avatarUrl } = req.body || {};
-  const updated = await prisma.user.update({
-    where: { id: req.user.id },
-    data: { name, avatarUrl },
-  });
+  const rows = await sql`
+    update "User"
+    set "name" = ${name}, "avatarUrl" = ${avatarUrl}
+    where id = ${req.user.id}
+    returning *
+  `;
+  const updated = rows[0] || null;
   res.json({ user: publicUser(updated) });
 });
 
@@ -27,14 +30,13 @@ accountRoutes.patch("/me/subscription", requireAuth, async (req, res) => {
   if (!okPlan || !okBill)
     return res.status(400).json({ error: "Invalid plan/billing" });
 
-  const updated = await prisma.user.update({
-    where: { id: req.user.id },
-    data: {
-      subscriptionPlan: plan,
-      subscriptionBilling: billing || null,
-      subscriptionSince: new Date(),
-    },
-  });
+  const rows = await sql`
+    update "User"
+    set "subscriptionPlan" = ${plan}, "subscriptionBilling" = ${billing || null}, "subscriptionSince" = now()
+    where id = ${req.user.id}
+    returning *
+  `;
+  const updated = rows[0] || null;
   res.json({ user: publicUser(updated) });
 });
 
@@ -45,14 +47,13 @@ accountRoutes.patch(
   requireRole("ADMIN"),
   async (req, res) => {
     const { plan, billing } = req.body || {};
-    const updated = await prisma.user.update({
-      where: { id: req.params.id },
-      data: {
-        subscriptionPlan: plan,
-        subscriptionBilling: billing || null,
-        subscriptionSince: new Date(),
-      },
-    });
+    const rows = await sql`
+      update "User"
+      set "subscriptionPlan" = ${plan}, "subscriptionBilling" = ${billing || null}, "subscriptionSince" = now()
+      where id = ${req.params.id}
+      returning *
+    `;
+    const updated = rows[0] || null;
     res.json({ user: publicUser(updated) });
   }
 );

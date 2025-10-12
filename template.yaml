@@ -46,15 +46,6 @@ Resources:
         AllowHeaders: ['*']
         AllowOrigins: ['*']
 
-  PrismaLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      LayerName: my-fitness-app-prisma-layer
-      Description: Prisma Client (linux-arm64-openssl-3.0.x)
-      ContentUri: layers/prisma
-      CompatibleRuntimes:
-        - nodejs20.x
-      RetentionPolicy: Delete
 
   ApiFunction:
     Type: AWS::Serverless::Function
@@ -63,8 +54,6 @@ Resources:
       CodeUri: server
       Handler: lambda-handler.handler
       Runtime: nodejs20.x
-      Layers:
-        - !Ref PrismaLayer
       VpcConfig: !If
         - UseVPC
         - SubnetIds: !Split [",", !Ref VpcSubnetIds]
@@ -109,8 +98,6 @@ Resources:
         External:
           # Loại bỏ aws-sdk v2 (đã có sẵn trong runtime). Keep @aws-sdk/* (v3) if used.
           - aws-sdk
-          # Để Prisma nằm ngoài bundle và cài riêng ở bước InstallCommands
-          - "@prisma/client"
 
 Outputs:
   ApiUrl:

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import crypto from "crypto";
-import { prisma } from "../db/prisma.js";
+import { sql } from "../db/sql.js";
 import { requireAuth } from "../middleware/authz.js";
 import { env } from "../config/env.js";
 
@@ -58,29 +58,12 @@ payRoutes.post("/create", async (req, res) => {
       info
     )}`;
 
-    // Lưu DB nếu trong Prisma có model Payment
+    // Lưu DB nếu có bảng "Payment" (nếu không có sẽ bị catch và bỏ qua)
     try {
-      if (prisma?.payment && typeof prisma.payment.create === "function") {
-        await prisma.payment.create({
-          data: {
-            id: paymentId,
-            userId,
-            amount,
-            currency: CURRENCY,
-            provider: "VIETQR",
-            plan,
-            billing,
-            status: "PENDING",
-            meta: {
-              imageUrl,
-              info,
-              bankBin: BANK_BIN,
-              account: BANK_ACC,
-              name: BANK_NAME,
-            },
-          },
-        });
-      }
+      await sql`
+        insert into "Payment" (id, "userId", amount, currency, provider, plan, billing, status, meta)
+        values (${paymentId}, ${userId}, ${amount}, ${CURRENCY}, 'VIETQR', ${plan}, ${billing}, 'PENDING', ${JSON.stringify({ imageUrl, info, bankBin: BANK_BIN, account: BANK_ACC, name: BANK_NAME })})
+      `;
     } catch (e) {
       if (process.env.NODE_ENV !== "test") {
         console.warn("PAYMENT_PERSIST_SKIP:", e?.code || e?.message);
@@ -108,8 +91,8 @@ payRoutes.get("/status/:id", async (req, res) => {
   try {
     let status = "PENDING";
     try {
-      const p = await prisma.payment.findUnique({ where: { id } });
-      if (p) status = p.status;
+      const rows = await sql`select status from "Payment" where id = ${id} limit 1`;
+      if (rows[0]) status = rows[0].status;
     } catch {}
     res.json({ ok: true, status });
   } catch (e) {

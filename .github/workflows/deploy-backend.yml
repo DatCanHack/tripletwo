@@ -57,23 +57,7 @@ jobs:
         run: |
           # Install full deps (keep esbuild in dependencies for SAM esbuild bundler)
           npm --prefix server ci
-          npm --prefix server run prisma:generate
 
-      - name: Prepare Prisma Layer (install + generate linux-arm64)
-        run: |
-          set -euo pipefail
-          npm --prefix layers/prisma/nodejs ci
-          # Generate Node-API library engine for linux-arm64 only (defined in schema)
-          PRISMA_CLI_QUERY_ENGINE_TYPE=library \
-          npx --prefix layers/prisma/nodejs prisma generate --schema layers/prisma/prisma/schema.prisma
-          # Trim layer: keep only linux-arm64 query engine, drop extras
-          PRISMA_ENG_DIR=layers/prisma/nodejs/node_modules/@prisma/engines
-          find "$PRISMA_ENG_DIR" -maxdepth 1 -type f ! -name 'libquery_engine-*linux-arm64*.*' -delete || true
-          rm -rf "$PRISMA_ENG_DIR"/dist "$PRISMA_ENG_DIR"/scripts || true
-          find layers/prisma/nodejs/node_modules -type f \( -name '*.md' -o -name '*.map' -o -name '*.d.ts' \) -delete || true
-          # Remove dev deps from layer to reduce size
-          npm --prefix layers/prisma/nodejs prune --omit=dev
-          du -sh layers/prisma || true
 
       - name: Show server folder size (debug)
         run: du -sh server || true

@@ -1,7 +1,7 @@
 // server/src/routes/ai.routes.js
 import { Router } from "express";
 import OpenAI from "openai";
-import { prisma } from "../db/prisma.js";
+import { sql } from "../db/sql.js";
 import { env } from "../config/env.js";
 import { requireAuth } from "../middleware/authz.js";
 
@@ -15,27 +15,25 @@ const openai = env.OPENAI_API_KEY
 /* ------------ Lấy catalog (an toàn ngay cả khi DB rỗng) ------------ */
 async function fetchCatalog(q = "", plan = "FREE") {
   try {
-    const whereLesson = q
-      ? { title: { contains: q, mode: "insensitive" } }
-      : undefined;
-
-    const whereProgram = q
-      ? { title: { contains: q, mode: "insensitive" } }
-      : undefined;
+    const like = `%${q}%`;
+    const whereLessons = q ? sql`where "title" ilike ${like}` : sql``;
+    const wherePrograms = q ? sql`where "title" ilike ${like}` : sql``;
 
     const [lessons, programs] = await Promise.all([
-      prisma.lesson.findMany({
-        where: whereLesson,
-        orderBy: { createdAt: "desc" },
-        take: 6,
-        select: { id: true, title: true, premiumOnly: true, duration: true },
-      }),
-      prisma.program.findMany({
-        where: whereProgram,
-        orderBy: { createdAt: "desc" },
-        take: 6,
-        select: { id: true, title: true, category: true, planMin: true },
-      }),
+      sql`
+        select id, title, "premiumOnly", duration
+        from "Lesson"
+        ${whereLessons}
+        order by "createdAt" desc
+        limit 6
+      `,
+      sql`
+        select id, title, category, "planMin"
+        from "Program"
+        ${wherePrograms}
+        order by "createdAt" desc
+        limit 6
+      `,
     ]);
 
     return { lessons, programs };

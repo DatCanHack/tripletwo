@@ -1,5 +1,5 @@
 // server/src/middleware/authz.js
-import { prisma } from "../db/prisma.js";
+import { sql } from "../db/sql.js";
 import { verifyAccess, verifyRefresh, signAccess } from "../utils/jwt.js";
 
 const isProd = process.env.NODE_ENV === "production";
@@ -27,19 +27,8 @@ export const requireAuth = async (req, res, next) => {
   const payload = tryVerify(bearer) || tryVerify(cookieTok);
   if (!payload) return res.status(401).json({ error: "Invalid/expired token" });
 
-  const user = await prisma.user.findUnique({
-    where: { id: payload.sub },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      active: true,
-      subscriptionPlan: true,
-      subscriptionBilling: true,
-      createdAt: true,
-    },
-  });
+  const rows = await sql`select id, email, name, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt" from "User" where id = ${payload.sub} limit 1`;
+  const user = rows[0] || null;
 
   if (!user || user.active === false) {
     return res.status(401).json({ error: "User not found" });
@@ -65,7 +54,8 @@ export const handleRefresh = async (req, res) => {
 
   try {
     const payload = verifyRefresh(token);
-    const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+    const rows = await sql`select * from "User" where id = ${payload.sub} limit 1`;
+    const user = rows[0] || null;
     if (!user) return res.status(401).json({ error: "User not found" });
 
     const access = signAccess(user.id);

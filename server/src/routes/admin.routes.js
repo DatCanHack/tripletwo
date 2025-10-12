@@ -1,6 +1,6 @@
 // server/src/routes/admin.routes.js
 import { Router } from "express";
-import { prisma } from "../db/prisma.js";
+import { sql } from "../db/sql.js";
 import { requireAuth, requireRole } from "../middleware/authz.js";
 
 export const adminRoutes = Router();
@@ -26,46 +26,26 @@ adminRoutes.get("/users", async (req, res, next) => {
   try {
     const q = String(req.query.q || "").trim();
     const page = Math.max(1, parseInt(req.query.page || "1", 10));
-    const limit = Math.min(
-      50,
-      Math.max(1, parseInt(req.query.limit || "20", 10))
-    );
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit || "20", 10)));
 
-    const where = q
-      ? {
-          OR: [
-            { email: { contains: q, mode: "insensitive" } },
-            { name: { contains: q, mode: "insensitive" } },
-          ],
-        }
-      : {};
+    const like = `%${q}%`;
+    const whereClause = q
+      ? sql`where "email" ilike ${like} or "name" ilike ${like}`
+      : sql``;
 
-    const [items, total] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          active: true,
-          subscriptionPlan: true,
-          subscriptionBilling: true,
-          createdAt: true,
-        },
-      }),
-      prisma.user.count({ where }),
-    ]);
+    const items = await sql`
+      select id, email, name, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt"
+      from "User"
+      ${whereClause}
+      order by "createdAt" desc
+      offset ${(page - 1) * limit}
+      limit ${limit}
+    `;
 
-    res.json({
-      items: items.map(toPublicUser),
-      total,
-      page,
-      limit,
-    });
+    const countRows = await sql`select count(*)::int as count from "User" ${whereClause}`;
+    const total = countRows[0]?.count || 0;
+
+    res.json({ items: items.map(toPublicUser), total, page, limit });
   } catch (e) {
     next(e);
   }
@@ -76,19 +56,8 @@ adminRoutes.get("/users", async (req, res, next) => {
  */
 adminRoutes.get("/users/:id", async (req, res, next) => {
   try {
-    const u = await prisma.user.findUnique({
-      where: { id: req.params.id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        active: true,
-        subscriptionPlan: true,
-        subscriptionBilling: true,
-        createdAt: true,
-      },
-    });
+const rows = await sql`select id, email, name, role, active, "subscriptionPlan", "subscriptionBilling", "createdAt" from "User" where id = ${req.params.id} limit 1`;
+    const u = rows[0] || null;
     if (!u) return res.status(404).json({ error: "Not found" });
     res.json({ user: toPublicUser(u) });
   } catch (e) {
@@ -105,11 +74,8 @@ adminRoutes.patch("/users/:id/role", async (req, res, next) => {
     if (!["ADMIN", "USER"].includes(role))
       return res.status(400).json({ error: "Invalid role" });
 
-    const u = await prisma.user.update({
-      where: { id: req.params.id },
-      data: { role },
-      select: { id: true, email: true, role: true },
-    });
+const upd = await sql`update "User" set role = ${role} where id = ${req.params.id} returning id, email, role`;
+    const u = upd[0] || null;
 
     res.json({ user: u });
   } catch (e) {
@@ -129,19 +95,13 @@ adminRoutes.patch("/users/:id/subscription", async (req, res, next) => {
     if (billing && !["MONTHLY", "YEARLY"].includes(billing))
       return res.status(400).json({ error: "Invalid billing" });
 
-    const u = await prisma.user.update({
-      where: { id: req.params.id },
-      data: {
-        subscriptionPlan: plan,
-        subscriptionBilling: billing || null,
-      },
-      select: {
-        id: true,
-        email: true,
-        subscriptionPlan: true,
-        subscriptionBilling: true,
-      },
-    });
+const upd = await sql`
+      update "User"
+      set "subscriptionPlan" = ${plan}, "subscriptionBilling" = ${billing || null}
+      where id = ${req.params.id}
+      returning id, email, "subscriptionPlan", "subscriptionBilling"
+    `;
+    const u = upd[0] || null;
 
     res.json({ user: u });
   } catch (e) {
@@ -155,11 +115,8 @@ adminRoutes.patch("/users/:id/subscription", async (req, res, next) => {
 adminRoutes.patch("/users/:id/active", async (req, res, next) => {
   try {
     const { active } = req.body || {};
-    const u = await prisma.user.update({
-      where: { id: req.params.id },
-      data: { active: !!active },
-      select: { id: true, email: true, active: true },
-    });
+const upd = await sql`update "User" set active = ${!!active} where id = ${req.params.id} returning id, email, active`;
+    const u = upd[0] || null;
     res.json({ user: u });
   } catch (e) {
     next(e);
@@ -171,7 +128,7 @@ adminRoutes.patch("/users/:id/active", async (req, res, next) => {
  */
 adminRoutes.delete("/users/:id", async (req, res, next) => {
   try {
-    await prisma.user.delete({ where: { id: req.params.id } });
+await sql`delete from "User" where id = ${req.params.id}`;
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -184,18 +141,16 @@ adminRoutes.delete("/users/:id", async (req, res, next) => {
  */
 adminRoutes.post("/invoices/:id/mark-paid", async (req, res, next) => {
   try {
-    const inv = await prisma.invoice.update({
-      where: { id: req.params.id },
-      data: { status: "PAID", paidAt: new Date() },
-    });
+const invRows = await sql`update "Invoice" set status = 'PAID', "paidAt" = now() where id = ${req.params.id} returning *`;
+    const inv = invRows[0];
 
-    await prisma.user.update({
-      where: { id: inv.userId },
-      data: {
-        subscriptionPlan: inv.plan,
-        subscriptionBilling: inv.billing,
-      },
-    });
+    if (inv?.userId) {
+      await sql`
+        update "User"
+        set "subscriptionPlan" = ${inv.plan}, "subscriptionBilling" = ${inv.billing}
+        where id = ${inv.userId}
+      `;
+    }
 
     res.json({ ok: true });
   } catch (e) {

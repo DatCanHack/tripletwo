@@ -4,7 +4,7 @@ import morgan from "morgan";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { env } from "./config/env.js";
-import prisma from "./config/database.js";
+import { sql, ensureDb } from "./db/sql.js";
 import { authRoutes } from "./routes/auth.routes.js";
 import { accountRoutes } from "./routes/account.routes.js";
 import { contentRoutes } from "./routes/content.routes.js";
@@ -109,8 +109,8 @@ app.get("/health", (_req, res) =>
 );
 app.get("/db-ping", async (_req, res) => {
   try {
-    await prisma.$connect();
-    await prisma.$queryRaw`SELECT 1`;
+    await ensureDb();
+    await sql`SELECT 1`;
     res.json({ db: "ok" });
   } catch (e) {
     res.status(500).json({ db: "fail", err: String(e) });

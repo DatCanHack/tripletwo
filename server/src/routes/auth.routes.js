@@ -2,7 +2,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { prisma, ensureDb } from "../db/prisma.js";
+import { sql, ensureDb } from "../db/sql.js";
 import { env } from "../config/env.js";
 import { signAccess, signRefresh, verifyRefresh } from "../utils/jwt.js";
 import { OAuth2Client } from "google-auth-library";
@@ -143,27 +143,24 @@ authRoutes.post("/google", async (req, res) => {
         .json({ error: "DB_CONNECT_TIMEOUT", message: "DB không sẵn sàng." });
     }
 
-    let user = await prisma.user.findUnique({ where: { email } });
+    let rows = await sql`select * from "User" where "email" = ${email} limit 1`;
+    let user = rows[0] || null;
     if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email,
-          name: name ?? null,
-          avatarUrl: picture ?? null,
-          provider: "GOOGLE",
-          googleId,
-        },
-      });
+      const ins = await sql`
+        insert into "User" ("email", "name", "avatarUrl", "provider", "googleId")
+        values (${email}, ${name ?? null}, ${picture ?? null}, 'GOOGLE', ${googleId})
+        returning *
+      `;
+      user = ins[0] || null;
     } else if (!user.googleId) {
       try {
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            googleId,
-            provider: "GOOGLE",
-            avatarUrl: user.avatarUrl ?? picture ?? null,
-          },
-        });
+        const upd = await sql`
+          update "User"
+          set "googleId" = ${googleId}, "provider" = 'GOOGLE', "avatarUrl" = coalesce("avatarUrl", ${picture ?? null})
+          where id = ${user.id}
+          returning *
+        `;
+        user = upd[0] || user;
       } catch {
         /* ignore if schema doesn't have these fields */
       }
@@ -208,14 +205,14 @@ authRoutes.post("/register", async (req, res) => {
     }
 
     const { name, email, password } = RegisterSchema.parse(req.body);
-    const existed = await prisma.user.findUnique({ where: { email } });
+    const existed = (await sql`select 1 from "User" where "email" = ${email} limit 1`)[0];
     if (existed) {
       return res
         .status(409)
         .json({ error: "EMAIL_EXISTS", message: "Email đã được đăng ký." });
     }
     const passwordHash = await bcrypt.hash(password, 10);
-    await prisma.user.create({ data: { name, email, passwordHash } });
+    await sql`insert into "User" ("name", "email", "passwordHash") values (${name}, ${email}, ${passwordHash})`;
     return res.status(201).json({ ok: true });
   } catch (err) {
     if (err?.issues) {
@@ -242,27 +239,14 @@ authRoutes.post("/login", async (req, res, next) => {
     const { email, password } = LoginSchema.parse(req.body);
 
     // đảm bảo kết nối Prisma đã sẵn sàng & giới hạn thời gian
-    await withTimeout(prisma.$connect(), 7000, "prisma.$connect");
+    await withTimeout(ensureDb(), 7000, "db.connect");
 
-    const user = await withTimeout(
-      prisma.user.findUnique({
-        where: { email },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          active: true,
-          subscriptionPlan: true,
-          subscriptionBilling: true,
-          passwordHash: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      }),
+    const userRows = await withTimeout(
+      sql`select id, name, email, role, active, "subscriptionPlan", "subscriptionBilling", "passwordHash", "createdAt", "updatedAt" from "User" where "email" = ${email} limit 1`,
       8000,
       "user.findUnique"
     );
+    const user = userRows[0] || null;
 
     if (!user) {
       return res.status(401).json({
@@ -317,27 +301,14 @@ authRoutes.post("/login", async (req, res, next) => {
     const { email, password } = LoginSchema.parse(req.body);
 
     // đảm bảo kết nối Prisma đã sẵn sàng & giới hạn thời gian
-    await withTimeout(prisma.$connect(), 7000, "prisma.$connect");
+    await withTimeout(ensureDb(), 7000, "db.connect");
 
-    const user = await withTimeout(
-      prisma.user.findUnique({
-        where: { email },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          active: true,
-          subscriptionPlan: true,
-          subscriptionBilling: true,
-          passwordHash: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      }),
+    const userRows = await withTimeout(
+      sql`select id, name, email, role, active, "subscriptionPlan", "subscriptionBilling", "passwordHash", "createdAt", "updatedAt" from "User" where "email" = ${email} limit 1`,
       8000,
       "user.findUnique"
     );
+    const user = userRows[0] || null;
 
     if (!user) {
       return res.status(401).json({
@@ -404,8 +375,8 @@ authRoutes.post("/logout", (_req, res) => {
 
 authRoutes.get("/__debug/db", async (_req, res) => {
   try {
-    await withTimeout(prisma.$connect(), 5000, "prisma.$connect");
-    await withTimeout(prisma.$queryRaw`select 1`, 5000, "select 1");
+    await withTimeout(ensureDb(), 5000, "db.connect");
+    await withTimeout(sql`select 1`, 5000, "select 1");
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, message: String(e?.message || e) });
