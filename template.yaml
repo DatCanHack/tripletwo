@@ -42,9 +42,10 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       CorsConfiguration:
-        AllowMethods: ['*']
-        AllowHeaders: ['*']
-        AllowOrigins: ['*']
+        AllowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+        AllowHeaders: ['Content-Type', 'Authorization', 'X-Amz-Date', 'X-Api-Key', 'X-Amz-Security-Token']
+        AllowOrigins: ['https://main.dezleujsj0pht.amplifyapp.com', 'https://dezleujsj0pht.amplifyapp.com', 'http://localhost:5173']
+        AllowCredentials: true
 
 
   ApiFunction:
