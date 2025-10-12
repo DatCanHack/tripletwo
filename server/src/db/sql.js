@@ -22,6 +22,6 @@ function withTimeout(promise, ms, label = "DB_TIMEOUT") {
   ]);
 }
 
-export async function ensureDb({ timeout = 4000 } = {}) {
+export async function ensureDb({ timeout = 15000 } = {}) {
   return withTimeout(sql`select 1`, timeout, "DB_TIMEOUT").then(() => true);
 }

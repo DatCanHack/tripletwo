@@ -54,11 +54,11 @@ Resources:
       CodeUri: server
       Handler: lambda-handler.handler
       Runtime: nodejs20.x
-      VpcConfig: !If
-        - UseVPC
-        - SubnetIds: !Split [",", !Ref VpcSubnetIds]
-          SecurityGroupIds: !Split [",", !Ref VpcSecurityGroupIds]
-        - !Ref AWS::NoValue
+      # VpcConfig: !If
+      #   - UseVPC
+      #   - SubnetIds: !Split [",", !Ref VpcSubnetIds]
+      #     SecurityGroupIds: !Split [",", !Ref VpcSecurityGroupIds]
+      #   - !Ref AWS::NoValue
       Events:
         ProxyApi:
           Type: HttpApi
