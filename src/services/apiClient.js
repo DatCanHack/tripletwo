@@ -7,6 +7,7 @@ const API_URL = String(
 
 /* ================= Token store (in-memory) ================= */
 let accessToken = null;
+let refreshTokenMem = null; // fallback when cookies are blocked (e.g., Safari cross-site)
 export const tokenStore = {
   set(t) {
     accessToken = t || null;
@@ -16,6 +17,18 @@ export const tokenStore = {
   },
   clear() {
     accessToken = null;
+  },
+};
+
+export const refreshStore = {
+  set(t) {
+    refreshTokenMem = t || null;
+  },
+  get() {
+    return refreshTokenMem;
+  },
+  clear() {
+    refreshTokenMem = null;
   },
 };
 
@@ -137,14 +150,20 @@ export async function refresh() {
     // thử tối đa 2 lần nếu gặp 503 (DB warm-up)
     for (let i = 0; i < 2; i++) {
       try {
+        // If we have a refresh token in memory, send it via Authorization header as fallback
+        const rt = refreshStore.get();
+        const headers = rt ? { Authorization: `Bearer ${rt}` } : undefined;
         const data = await request("/auth/refresh", {
           method: "POST",
+          headers,
           retry: false,
           timeout: 30000,
           skipAuth: true, // ✅ quan trọng
         });
         if (data?.accessToken) {
           tokenStore.set(data.accessToken);
+          // server may also rotate refresh token in body in the future
+          if (data?.refreshToken) refreshStore.set(data.refreshToken);
           return true;
         }
         tokenStore.clear();
@@ -188,6 +207,7 @@ async function loginWithGoogle({ access_token, id_token, credential } = {}) {
     timeout: 45000, // tăng thời gian cho lần cold-start
   });
   tokenStore.set(data?.accessToken || null);
+  refreshStore.set(data?.refreshToken || null);
   return data;
 }
 
@@ -201,6 +221,7 @@ export const api = {
       timeout: 45000, // ✅ tăng timeout cho lần đầu server warm-up
     });
     tokenStore.set(data?.accessToken || null);
+    refreshStore.set(data?.refreshToken || null);
     return data;
   },
 
@@ -215,6 +236,7 @@ export const api = {
 
   async logout() {
     tokenStore.clear();
+    refreshStore.clear();
     try {
       await request("/auth/logout", { method: "POST", retry: false });
     } catch {}

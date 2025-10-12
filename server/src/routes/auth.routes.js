@@ -186,7 +186,8 @@ authRoutes.post("/google", async (req, res) => {
     setAccessCookie(res, accessToken);
     setRefreshCookie(res, refreshToken);
 
-    return res.json({ ok: true, accessToken, user: toPublicUser(user) });
+    // Include refreshToken in body to support browsers blocking cross-site cookies
+    return res.json({ ok: true, accessToken, refreshToken, user: toPublicUser(user) });
   } catch (err) {
     console.error("GOOGLE_LOGIN_ERROR:", err);
     return res.status(401).json({
@@ -305,7 +306,8 @@ authRoutes.post("/login", async (req, res, next) => {
     setRefreshCookie(res, refreshToken);
 
     const { password: _, ...rest } = user;
-    return res.json({ ok: true, accessToken, user: toPublicUser(rest) });
+    // Include refreshToken for FE fallback when cookies are blocked
+    return res.json({ ok: true, accessToken, refreshToken, user: toPublicUser(rest) });
   } catch (err) {
     // Nếu là timeout DB → trả 503 để FE không hiểu nhầm là lỗi form
     if (String(err?.message || "").startsWith("Timeout at")) {
@@ -329,7 +331,12 @@ authRoutes.post("/login", async (req, res, next) => {
 /* ---------- /auth/refresh ---------- */
 authRoutes.post("/refresh", async (req, res) => {
   try {
-    const token = req.cookies[REFRESH_COOKIE];
+    // Prefer cookie; fall back to Authorization: Bearer <refreshToken>
+    let token = req.cookies[REFRESH_COOKIE];
+    if (!token) {
+      const auth = req.headers.authorization;
+      if (auth && auth.startsWith("Bearer ")) token = auth.slice(7);
+    }
     if (!token) {
       return res.status(401).json({ error: "NO_REFRESH_TOKEN" });
     }
