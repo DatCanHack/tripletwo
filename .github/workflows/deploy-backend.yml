@@ -49,8 +49,17 @@ jobs:
 
       - name: Install dependencies (server only)
         run: |
+          # 1) Install with dev deps to allow prisma generate
           npm --prefix server ci
           npm --prefix server run prisma:generate
+          
+          # 2) Remove dev deps and heavy, unused Prisma engines to shrink package size
+          npm --prefix server prune --omit=dev
+          rm -rf server/node_modules/prisma || true
+          rm -rf server/node_modules/@prisma/engines || true
+
+      - name: Show server folder size (debug)
+        run: du -sh server || true
 
       - name: SAM Build
         run: sam build
