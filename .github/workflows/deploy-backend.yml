@@ -56,7 +56,10 @@ jobs:
       - name: Install dependencies (server only)
         run: |
           # Install full deps (keep esbuild in dependencies for SAM esbuild bundler)
-          npm --prefix server ci
+          cd server
+          npm ci
+          # Generate Prisma client
+          npx prisma generate
 
 
       - name: Show server folder size (debug)
