@@ -154,9 +154,10 @@ authRoutes.post("/google", async (req, res) => {
     let user = rows[0] || null;
     if (!user) {
       const userId = generateId();
+      const now = new Date();
       const ins = await sql`
-        insert into users (id, email, name, "googleId")
-        values (${userId}, ${email}, ${name ?? null}, ${googleId})
+        insert into users (id, email, name, "googleId", "createdAt", "updatedAt")
+        values (${userId}, ${email}, ${name ?? null}, ${googleId}, ${now}, ${now})
         returning *
       `;
       user = ins[0] || null;
@@ -235,8 +236,9 @@ authRoutes.post("/register", async (req, res) => {
     // Step 5: Insert user
     console.log("[auth/register] Step 5: Inserting user...");
     const userId = generateId();
+    const now = new Date();
     console.log("[auth/register] Step 5: Generated ID:", userId);
-    await sql`insert into users (id, name, email, password) values (${userId}, ${name}, ${email}, ${passwordHash})`;
+    await sql`insert into users (id, name, email, password, "createdAt", "updatedAt") values (${userId}, ${name}, ${email}, ${passwordHash}, ${now}, ${now})`;
     console.log("[auth/register] Step 5: User inserted OK");
     
     return res.status(201).json({ ok: true });
