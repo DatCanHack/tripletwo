@@ -83,11 +83,11 @@ const corsOptions = {
   origin(origin, cb) {
     // server-to-server / healthcheck (không có Origin) -> cho qua
     if (!origin) return cb(null, true);
-    if (isLocalhost(origin)) return cb(null, true);
+    if (isLocalhost(origin)) return cb(null, origin); // Return specific origin
 
     for (const rule of allowlist) {
       if (ruleMatchOrigin(rule, origin)) {
-        return cb(null, true);
+        return cb(null, origin); // Return the specific origin instead of true
       }
     }
 
@@ -95,7 +95,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cache-Control", "Pragma"],
   optionsSuccessStatus: 204,
 };
 
