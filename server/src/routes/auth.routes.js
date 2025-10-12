@@ -57,9 +57,9 @@ function toPublicUser(u) {
     id: u.id,
     email: u.email,
     name: u.name ?? null,
-    role: u.role,
-    active: u.active,
-    subscriptionPlan: u.subscriptionPlan,
+    role: u.role ?? 'USER',
+    active: u.active ?? true,
+    subscriptionPlan: u.subscriptionPlan ?? 'FREE',
     subscriptionBilling: u.subscriptionBilling ?? null,
     createdAt: u.createdAt,
     updatedAt: u.updatedAt,
@@ -143,20 +143,20 @@ authRoutes.post("/google", async (req, res) => {
         .json({ error: "DB_CONNECT_TIMEOUT", message: "DB không sẵn sàng." });
     }
 
-    let rows = await sql`select * from "User" where "email" = ${email} limit 1`;
+    let rows = await sql`select * from users where email = ${email} limit 1`;
     let user = rows[0] || null;
     if (!user) {
       const ins = await sql`
-        insert into "User" ("email", "name", "avatarUrl", "provider", "googleId")
-        values (${email}, ${name ?? null}, ${picture ?? null}, 'GOOGLE', ${googleId})
+        insert into users (email, name, "googleId")
+        values (${email}, ${name ?? null}, ${googleId})
         returning *
       `;
       user = ins[0] || null;
     } else if (!user.googleId) {
       try {
         const upd = await sql`
-          update "User"
-          set "googleId" = ${googleId}, "provider" = 'GOOGLE', "avatarUrl" = coalesce("avatarUrl", ${picture ?? null})
+          update users
+          set "googleId" = ${googleId}
           where id = ${user.id}
           returning *
         `;
@@ -205,14 +205,14 @@ authRoutes.post("/register", async (req, res) => {
     }
 
     const { name, email, password } = RegisterSchema.parse(req.body);
-    const existed = (await sql`select 1 from "User" where "email" = ${email} limit 1`)[0];
+    const existed = (await sql`select 1 from users where email = ${email} limit 1`)[0];
     if (existed) {
       return res
         .status(409)
         .json({ error: "EMAIL_EXISTS", message: "Email đã được đăng ký." });
     }
     const passwordHash = await bcrypt.hash(password, 10);
-    await sql`insert into "User" ("name", "email", "passwordHash") values (${name}, ${email}, ${passwordHash})`;
+    await sql`insert into users (name, email, password) values (${name}, ${email}, ${passwordHash})`;
     return res.status(201).json({ ok: true });
   } catch (err) {
     if (err?.issues) {
@@ -242,7 +242,7 @@ authRoutes.post("/login", async (req, res, next) => {
     await withTimeout(ensureDb(), 7000, "db.connect");
 
     const userRows = await withTimeout(
-      sql`select id, name, email, role, active, "subscriptionPlan", "subscriptionBilling", "passwordHash", "createdAt", "updatedAt" from "User" where "email" = ${email} limit 1`,
+      sql`select id, name, email, password, "createdAt", "updatedAt" from users where email = ${email} limit 1`,
       8000,
       "user.findUnique"
     );
@@ -256,7 +256,7 @@ authRoutes.post("/login", async (req, res, next) => {
     }
 
     const ok = await withTimeout(
-      bcrypt.compare(password, user.passwordHash || ""),
+      bcrypt.compare(password, user.password || ""),
       4000,
       "bcrypt.compare"
     );
@@ -273,7 +273,7 @@ authRoutes.post("/login", async (req, res, next) => {
     setAccessCookie(res, accessToken);
     setRefreshCookie(res, refreshToken);
 
-    const { passwordHash, ...rest } = user;
+    const { password: _, ...rest } = user;
     return res.json({ ok: true, accessToken, user: toPublicUser(rest) });
   } catch (err) {
     // Nếu là timeout DB → trả 503 để FE không hiểu nhầm là lỗi form
@@ -296,64 +296,32 @@ authRoutes.post("/login", async (req, res, next) => {
 });
 
 /* ---------- /auth/refresh ---------- */
-authRoutes.post("/login", async (req, res, next) => {
+authRoutes.post("/refresh", async (req, res) => {
   try {
-    const { email, password } = LoginSchema.parse(req.body);
+    const token = req.cookies[REFRESH_COOKIE];
+    if (!token) {
+      return res.status(401).json({ error: "NO_REFRESH_TOKEN" });
+    }
 
-    // đảm bảo kết nối Prisma đã sẵn sàng & giới hạn thời gian
-    await withTimeout(ensureDb(), 7000, "db.connect");
+    const decoded = verifyRefresh(token);
+    if (!decoded?.userId) {
+      return res.status(401).json({ error: "INVALID_REFRESH_TOKEN" });
+    }
 
-    const userRows = await withTimeout(
-      sql`select id, name, email, role, active, "subscriptionPlan", "subscriptionBilling", "passwordHash", "createdAt", "updatedAt" from "User" where "email" = ${email} limit 1`,
-      8000,
-      "user.findUnique"
-    );
+    await ensureDb();
+    const userRows = await sql`select id, name, email, "createdAt", "updatedAt" from users where id = ${decoded.userId} limit 1`;
     const user = userRows[0] || null;
 
     if (!user) {
-      return res.status(401).json({
-        error: "INVALID_CREDENTIALS",
-        message: "Email hoặc mật khẩu không đúng.",
-      });
-    }
-
-    const ok = await withTimeout(
-      bcrypt.compare(password, user.passwordHash || ""),
-      4000,
-      "bcrypt.compare"
-    );
-    if (!ok) {
-      return res.status(401).json({
-        error: "INVALID_CREDENTIALS",
-        message: "Email hoặc mật khẩu không đúng.",
-      });
+      return res.status(401).json({ error: "USER_NOT_FOUND" });
     }
 
     const accessToken = signAccess(user.id);
-    const refreshToken = signRefresh(user.id);
-
     setAccessCookie(res, accessToken);
-    setRefreshCookie(res, refreshToken);
 
-    const { passwordHash, ...rest } = user;
-    return res.json({ ok: true, accessToken, user: toPublicUser(rest) });
+    return res.json({ ok: true, accessToken, user: toPublicUser(user) });
   } catch (err) {
-    // Nếu là timeout DB → trả 503 để FE không hiểu nhầm là lỗi form
-    if (String(err?.message || "").startsWith("Timeout at")) {
-      console.error("[auth/login] DB timeout:", err.message);
-      return res.status(503).json({
-        error: "DB_TIMEOUT",
-        message: "Hệ thống đang bận. Vui lòng thử lại.",
-      });
-    }
-    if (err?.issues) {
-      return res.status(400).json({
-        error: "VALIDATION_ERROR",
-        issues: zodIssues(err),
-        message: "Dữ liệu không hợp lệ",
-      });
-    }
-    next(err);
+    return res.status(401).json({ error: "INVALID_REFRESH_TOKEN" });
   }
 });
 /* ---------- /auth/logout ---------- */
