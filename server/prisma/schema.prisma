@@ -13,8 +13,19 @@ model User {
   name          String?
   password      String?
   googleId      String?        @unique
+  // New auth/role fields
+  role          String         @default("USER")
+  active        Boolean        @default(true)
+  // Profile
+  avatarUrl     String?
+  // Subscription fields (text-based to match existing DB usage)
+  subscriptionPlan     String?
+  subscriptionBilling  String?
+  subscriptionSince    DateTime?
+
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+
   achievements  Achievement[]
   exercises     Exercise[]
   goals         Goal[]
