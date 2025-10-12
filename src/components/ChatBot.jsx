@@ -150,27 +150,28 @@ export default function ChatBot() {
         },
       ]);
     } catch (e) {
+      console.error('AI Chat error:', e);
+      let errorMessage = "Mạng chập chờ̀n, bạn thử lại giúp mình nhé.";
+      
       // nếu BE vẫn trả 401 vì hết refresh => báo đăng nhập
       if (e?.status === 401) {
-        setMsgs((m) => [
-          ...m,
-          {
-            id: uuid(),
-            role: "assistant",
-            content:
-              "Phiên đăng nhập đã hết hạn hoặc bạn chưa đăng nhập. Vui lòng đăng nhập để tiếp tục dùng AI Coach.",
-          },
-        ]);
-      } else {
-        setMsgs((m) => [
-          ...m,
-          {
-            id: uuid(),
-            role: "assistant",
-            content: "Mạng chập chờn, bạn thử lại giúp mình nhé.",
-          },
-        ]);
+        errorMessage = "Phiên đăng nhập đã hết hạn hoặc bạn chưa đăng nhập. Vui lòng đăng nhập để tiếp tục dùng AI Coach.";
+      } else if (e?.code === 'NETWORK_ERROR') {
+        errorMessage = "Không thể kết nối đến máy chủ. Kiểm tra mạng và thử lại.";
+      } else if (e?.code === 'TIMEOUT') {
+        errorMessage = "AI đang bận, bạn chờ chút và thử lại nhé.";
+      } else if (e?.status === 500) {
+        errorMessage = "AI đang bảo trì, bạn thử lại sau vài phút nhé.";
       }
+      
+      setMsgs((m) => [
+        ...m,
+        {
+          id: uuid(),
+          role: "assistant",
+          content: errorMessage,
+        },
+      ]);
     } finally {
       setBusy(false);
     }

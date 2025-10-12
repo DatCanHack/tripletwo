@@ -132,7 +132,20 @@ export default function Checkout() {
       setQrData(resp);
       setShowQR(true);
     } catch (err) {
-      setServerError(err?.message || "Không tạo được VietQR, thử lại nhé.");
+      console.error('Payment creation error:', err);
+      let errorMessage = "Không tạo được VietQR, thử lại nhé.";
+      
+      if (err?.code === 'NETWORK_ERROR') {
+        errorMessage = "Không thể kết nối đến máy chủ. Kiểm tra kết nối mạng và thử lại.";
+      } else if (err?.code === 'TIMEOUT') {
+        errorMessage = "Yêu cầu quá thời gian. Vui lòng thử lại.";
+      } else if (err?.status === 401) {
+        errorMessage = "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.";
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      
+      setServerError(errorMessage);
     } finally {
       setSubmitting(false);
     }

@@ -19,25 +19,40 @@ async function fetchCatalog(q = "", plan = "FREE") {
     const whereLessons = q ? sql`where "title" ilike ${like}` : sql``;
     const wherePrograms = q ? sql`where "title" ilike ${like}` : sql``;
 
-    const [lessons, programs] = await Promise.all([
-      sql`
+    let lessons = [];
+    let programs = [];
+
+    // Try to fetch lessons, fallback to empty if table doesn't exist
+    try {
+      lessons = await sql`
         select id, title, "premiumOnly", duration
         from "Lesson"
         ${whereLessons}
         order by "createdAt" desc
         limit 6
-      `,
-      sql`
+      `;
+    } catch (e) {
+      console.log('Lesson table not available:', e.message);
+      lessons = [];
+    }
+
+    // Try to fetch programs, fallback to empty if table doesn't exist
+    try {
+      programs = await sql`
         select id, title, category, "planMin"
         from "Program"
         ${wherePrograms}
         order by "createdAt" desc
         limit 6
-      `,
-    ]);
+      `;
+    } catch (e) {
+      console.log('Program table not available:', e.message);
+      programs = [];
+    }
 
     return { lessons, programs };
-  } catch {
+  } catch (e) {
+    console.warn('Catalog fetch error:', e);
     return { lessons: [], programs: [] };
   }
 }

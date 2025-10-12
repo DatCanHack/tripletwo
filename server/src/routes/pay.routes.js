@@ -85,17 +85,60 @@ payRoutes.post("/create", async (req, res) => {
   }
 });
 
-/** Kiểm tra trạng thái (polling) */
+/** Kiểm tra trạng thái (polling) - alias for invoice endpoint */
 payRoutes.get("/status/:id", async (req, res) => {
   const id = req.params.id;
   try {
     let status = "PENDING";
+    let invoice = null;
     try {
-      const rows = await sql`select status from "Payment" where id = ${id} limit 1`;
-      if (rows[0]) status = rows[0].status;
+      const rows = await sql`select * from "Payment" where id = ${id} limit 1`;
+      if (rows[0]) {
+        invoice = rows[0];
+        status = rows[0].status;
+      }
     } catch {}
-    res.json({ ok: true, status });
+    res.json({ ok: true, status, invoice });
   } catch (e) {
     res.status(500).json({ error: "INTERNAL" });
+  }
+});
+
+/** Get invoice details (for compatibility with frontend) */
+payRoutes.get("/invoice/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+    let payment = null;
+    try {
+      const rows = await sql`select * from "Payment" where id = ${id} limit 1`;
+      payment = rows[0] || null;
+    } catch (e) {
+      console.warn('Payment table query failed:', e.message);
+    }
+    
+    if (!payment) {
+      // Mock response for testing when no Payment table
+      return res.json({
+        id,
+        status: "PENDING",
+        amount: 0,
+        currency: "VND",
+        message: "Invoice not found or Payment table not available"
+      });
+    }
+    
+    res.json({
+      id: payment.id,
+      status: payment.status,
+      amount: payment.amount,
+      currency: payment.currency,
+      plan: payment.plan,
+      billing: payment.billing,
+      createdAt: payment.createdAt,
+      meta: payment.meta
+    });
+  } catch (e) {
+    console.error('Invoice fetch error:', e);
+    res.status(500).json({ error: "INTERNAL", message: "Unable to fetch invoice" });
   }
 });
