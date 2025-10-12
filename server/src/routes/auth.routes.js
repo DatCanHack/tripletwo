@@ -7,6 +7,13 @@ import { env } from "../config/env.js";
 import { signAccess, signRefresh, verifyRefresh } from "../utils/jwt.js";
 import { OAuth2Client } from "google-auth-library";
 
+// Simple CUID-like ID generator
+function generateId() {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `c${timestamp}${random}`;
+}
+
 export const authRoutes = Router();
 // helper timeout an toàn cho promise
 const withTimeout = (p, ms, label) =>
@@ -146,9 +153,10 @@ authRoutes.post("/google", async (req, res) => {
     let rows = await sql`select * from users where email = ${email} limit 1`;
     let user = rows[0] || null;
     if (!user) {
+      const userId = generateId();
       const ins = await sql`
-        insert into users (email, name, "googleId")
-        values (${email}, ${name ?? null}, ${googleId})
+        insert into users (id, email, name, "googleId")
+        values (${userId}, ${email}, ${name ?? null}, ${googleId})
         returning *
       `;
       user = ins[0] || null;
@@ -226,7 +234,9 @@ authRoutes.post("/register", async (req, res) => {
     
     // Step 5: Insert user
     console.log("[auth/register] Step 5: Inserting user...");
-    await sql`insert into users (name, email, password) values (${name}, ${email}, ${passwordHash})`;
+    const userId = generateId();
+    console.log("[auth/register] Step 5: Generated ID:", userId);
+    await sql`insert into users (id, name, email, password) values (${userId}, ${name}, ${email}, ${passwordHash})`;
     console.log("[auth/register] Step 5: User inserted OK");
     
     return res.status(201).json({ ok: true });
