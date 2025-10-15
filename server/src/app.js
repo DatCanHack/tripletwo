@@ -34,6 +34,7 @@ const DEFAULT_ALLOWLIST = [
   process.env.WEB_URL || null,
   "https://twentytwo-eight.vercel.app",
   "https://main.dezleujsj0pht.amplifyapp.com",
+  "https://tripletwo.dpdns.org",
 ].filter(Boolean);
 
 // Nếu có CORS_ORIGIN thì dùng THÊM cùng với mặc định (không ghi đè)
